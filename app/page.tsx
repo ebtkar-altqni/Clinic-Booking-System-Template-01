@@ -29,7 +29,7 @@ export default function HomePage() {
               <span className="text-xl font-bold">MediCare</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/sign-in">
+              <Link href="/sign-in" className="hidden md:block">
                 <Button variant="ghost">Sign In</Button>
               </Link>
               <Link href="/book-appointment">
