@@ -1,0 +1,312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  firstName String
+  lastName  String
+  phone     String
+  role      UserRole
+  password  String
+  avatar    String?
+  
+  // Profile information
+  dateOfBirth DateTime?
+  gender      Gender?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  
+  // Medical information (for patients)
+  bloodType        String?
+  allergies        String[]
+  medications      String[]
+  emergencyContact EmergencyContact?
+  
+  // Professional information (for doctors)
+  specialty     String?
+  licenseNumber String?
+  experience    Int?
+  education     String[]
+  certifications String[]
+  bio           String?
+  consultationFee Float?
+  
+  // Relationships
+  patientAppointments Appointment[] @relation("PatientAppointments")
+  doctorAppointments  Appointment[] @relation("DoctorAppointments")
+  availability        Availability[]
+  medicalRecords      MedicalRecord[]
+  payments            Payment[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("users")
+}
+
+model Appointment {
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Patient and Doctor
+  patientId   String            @db.ObjectId
+  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctorId    String            @db.ObjectId
+  doctor      User              @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  
+  // Appointment details
+  date        DateTime
+  time        String
+  duration    Int               @default(30) // in minutes
+  type        AppointmentType
+  status      AppointmentStatus @default(PENDING)
+  reason      String
+  notes       String?
+  
+  // Follow-up
+  followUpRequired Boolean @default(false)
+  followUpDate     DateTime?
+  
+  // Payment
+  fee         Float
+  paymentId   String?           @db.ObjectId
+  payment     Payment?          @relation(fields: [paymentId], references: [id])
+  
+  // Medical record
+  medicalRecordId String?        @db.ObjectId
+  medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
+  
+  // Timestamps
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  @@map("appointments")
+}
+
+model Availability {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  
+  doctorId  String    @db.ObjectId
+  doctor    User      @relation(fields: [doctorId], references: [id])
+  
+  dayOfWeek Int       // 0 = Sunday, 1 = Monday, etc.
+  startTime String    // "09:00"
+  endTime   String    // "17:00"
+  isActive  Boolean   @default(true)
+  
+  // Break times
+  breakStartTime String? // "12:00"
+  breakEndTime   String? // "13:00"
+  
+  // Date-specific overrides
+  date      DateTime? // For specific date availability
+  isHoliday Boolean   @default(false)
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  @@map("availability")
+}
+
+model MedicalRecord {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  patientId     String   @db.ObjectId
+  patient       User     @relation(fields: [patientId], references: [id])
+  
+  // Visit information
+  visitDate     DateTime
+  chiefComplaint String
+  symptoms      String[]
+  diagnosis     String
+  treatment     String
+  prescription  String?
+  
+  // Vital signs
+  bloodPressure String?
+  heartRate     Int?
+  temperature   Float?
+  weight        Float?
+  height        Float?
+  
+  // Lab results
+  labResults    Json?
+  
+  // Files and images
+  attachments   String[]
+  
+  // Follow-up
+  followUpInstructions String?
+  nextVisitDate        DateTime?
+  
+  // Relationships
+  appointments  Appointment[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("medical_records")
+}
+
+model Payment {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  
+  userId          String        @db.ObjectId
+  user            User          @relation(fields: [userId], references: [id])
+  
+  amount          Float
+  currency        String        @default("USD")
+  status          PaymentStatus @default(PENDING)
+  method          PaymentMethod
+  
+  // Payment processor details
+  stripePaymentId String?
+  transactionId   String?
+  
+  // Billing information
+  billingAddress  Json?
+  
+  // Relationships
+  appointments    Appointment[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@map("payments")
+}
+
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  
+  userId    String           @db.ObjectId
+  
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  
+  // Related entities
+  appointmentId String?      @db.ObjectId
+  
+  // Delivery
+  emailSent Boolean          @default(false)
+  smsSent   Boolean          @default(false)
+  
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  
+  @@map("notifications")
+}
+
+model ClinicSettings {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  clinicName        String
+  address           String
+  phone             String
+  email             String
+  website           String?
+  
+  // Business hours
+  businessHours     Json
+  
+  // Appointment settings
+  defaultAppointmentDuration Int @default(30)
+  advanceBookingDays         Int @default(30)
+  cancellationHours          Int @default(24)
+  
+  // Payment settings
+  acceptedPaymentMethods     String[]
+  
+  // Notification settings
+  emailNotifications         Boolean @default(true)
+  smsNotifications          Boolean @default(false)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("clinic_settings")
+}
+
+// Embedded types
+type EmergencyContact {
+  name         String
+  relationship String
+  phone        String
+  email        String?
+}
+
+// Enums
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+  STAFF
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AppointmentType {
+  CONSULTATION
+  FOLLOW_UP
+  CHECK_UP
+  EMERGENCY
+  VACCINATION
+  PROCEDURE
+  THERAPY
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  INSURANCE
+  CASH
+  CHECK
+  BANK_TRANSFER
+}
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMATION
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLATION
+  APPOINTMENT_RESCHEDULED
+  PAYMENT_CONFIRMATION
+  PAYMENT_FAILED
+  GENERAL
+}
